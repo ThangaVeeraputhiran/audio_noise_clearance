@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Speech Enhancement</title>
+  <style>
+    :root {
+      --bg: #f6f0e5;
+      --ink: #1d1c1a;
+      --accent: #ce6b2f;
+      --muted: #7b746c;
+      --panel: #fff7ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Georgia", "Times New Roman", serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 10% 20%, #f7e1c8 0%, var(--bg) 45%),
+                  radial-gradient(circle at 90% 10%, #edd7c3 0%, var(--bg) 40%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }
+    .card {
+      width: min(920px, 95vw);
+      background: var(--panel);
+      border: 2px solid var(--ink);
+      box-shadow: 10px 10px 0 var(--ink);
+      padding: 28px;
+      display: grid;
+      gap: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: 0.5px;
+    }
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    .controls {
+      display: grid;
+      gap: 12px;
+    }
+    input[type="file"] {
+      border: 2px dashed var(--ink);
+      padding: 16px;
+      background: white;
+    }
+    button {
+      background: var(--accent);
+      color: white;
+      border: 2px solid var(--ink);
+      padding: 12px 16px;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .result {
+      display: none;
+      border-top: 2px solid var(--ink);
+      padding-top: 16px;
+      gap: 8px;
+    }
+    .result.active {
+      display: grid;
+    }
+    audio { width: 100%; }
+    .link {
+      color: var(--ink);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Speech Enhancement</h1>
+    <p>Upload a noisy audio file. The model will remove background noise and return a clean version.</p>
+
+    <div class="controls">
+      <input id="file" type="file" accept="audio/*" />
+      <button id="run">Enhance Audio</button>
+      <span id="status" class="status">Waiting for file...</span>
+    </div>
+
+    <div id="result" class="result">
+      <strong>Enhanced Output</strong>
+      <audio id="player" controls></audio>
+      <a id="download" class="link" download>Download enhanced WAV</a>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById("file");
+    const runBtn = document.getElementById("run");
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    const player = document.getElementById("player");
+    const download = document.getElementById("download");
+
+    runBtn.addEventListener("click", async () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        status.textContent = "Please choose an audio file.";
+        return;
+      }
+
+      runBtn.disabled = true;
+      status.textContent = "Processing...";
+      result.classList.remove("active");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const response = await fetch("/api/enhance", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || "Failed to enhance audio.");
+        }
+
+        const data = await response.json();
+        player.src = data.url;
+        download.href = data.url;
+        download.textContent = "Download enhanced WAV";
+        result.classList.add("active");
+        status.textContent = "Done.";
+      } catch (err) {
+        status.textContent = err.message;
+      } finally {
+        runBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

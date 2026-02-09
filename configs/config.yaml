@@ -1,0 +1,119 @@
+# Model Configuration
+model:
+  name: "TransformerSpeechEnhancement"
+  
+  # Transformer parameters
+  d_model: 512
+  nhead: 8
+  num_encoder_layers: 6
+  dim_feedforward: 2048
+  dropout: 0.1
+  
+  # Audio parameters
+  n_fft: 1024
+  hop_length: 256
+  win_length: 1024
+  n_mels: 128
+  sample_rate: 16000
+  
+  # Cooperative learning
+  use_cooperative: true
+  num_tasks: 2  # Main denoising + auxiliary task
+
+# Training Configuration
+training:
+  batch_size: 16
+  num_epochs: 120
+  learning_rate: 0.00001
+  weight_decay: 0.00001
+  
+  # Optimizer
+  optimizer: "Adam"
+  scheduler: "ReduceLROnPlateau"
+  scheduler_patience: 5
+  scheduler_factor: 0.5
+  
+  # Loss functions
+  loss_type: "mae"  # Options: mse, mae, si_snr, combined
+  loss_weights:
+    reconstruction: 1.0
+    perceptual: 0.5
+    cooperative: 0.3
+  
+  # Early stopping
+  early_stopping: false
+  patience: 10
+  
+  # Gradient clipping
+  grad_clip: 5.0
+
+# Data Configuration
+data:
+  # Dataset paths
+  clean_dir: "data/clean"
+  noise_dir: "data/noise"
+  noisy_dir: "data/noisy"
+  
+  # Data split ratios
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  
+  # Audio parameters
+  sample_rate: 16000
+  segment_length: 4.0  # seconds
+  
+  # Data augmentation
+  augmentation:
+    enable: true
+    pitch_shift: true
+    time_stretch: true
+    add_noise: true
+    noise_snr_range: [-10, 5]  # dB
+  
+  # Noise types
+  noise_types:
+    - "white"
+    - "babble"
+    - "street"
+    - "cafe"
+    - "office"
+
+# Evaluation Configuration
+evaluation:
+  metrics:
+    - "pesq"
+    - "stoi"
+    - "si_snr"
+    - "sdr"
+  
+  # Save enhanced audio
+  save_enhanced: true
+  enhanced_dir: "data/enhanced"
+
+# Logging and Checkpointing
+logging:
+  use_tensorboard: true
+  log_dir: "results/logs"
+  log_interval: 10  # steps
+  
+  use_wandb: false
+  wandb_project: "speech-enhancement"
+  wandb_entity: ""
+
+checkpoint:
+  save_dir: "checkpoints"
+  save_interval: 5  # epochs
+  save_best_only: true
+  monitor_metric: "val_pesq"
+  mode: "max"
+
+# Hardware Configuration
+hardware:
+  device: "cuda"  # cuda, cpu, mps
+  num_workers: 4
+  pin_memory: true
+  
+# Reproducibility
+seed: 42
+deterministic: true
