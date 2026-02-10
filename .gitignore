@@ -21,24 +21,9 @@ ENV/
 
 # Data directories (don't commit large datasets)
 data/
-data/clean/*.wav
-data/clean/*.flac
-data/clean/*.mp3
-data/noise/*.wav
-data/noise/*.flac
-data/noise/*.mp3
-data/noisy/*.wav
-data/noisy/*.flac
-data/noisy/*.mp3
-data/enhanced/*.wav
-data/enhanced/*.flac
-data/enhanced/*.mp3
-
-# Keep directory structure but ignore contents
-!data/clean/README.md
-!data/noise/README.md
-!data/noisy/README.md
-!data/enhanced/README.md
+data/**/*.wav
+data/**/*.flac
+data/**/*.mp3
 
 # Model checkpoints
 checkpoints/**/*.pt
