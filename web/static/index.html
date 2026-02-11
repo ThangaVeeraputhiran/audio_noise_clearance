@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Speech Enhancement</title>
+  <title>Background Noise Clearance and Speech Enhancement</title>
   <style>
     :root {
       --bg: #f6f0e5;
@@ -39,6 +39,12 @@
       font-size: 32px;
       letter-spacing: 0.5px;
     }
+        h2 {
+          margin: 0;
+          font-size: 18px;
+          text-transform: uppercase;
+          letter-spacing: 1.2px;
+        }
     p {
       margin: 0;
       color: var(--muted);
@@ -85,11 +91,33 @@
       color: var(--ink);
       text-decoration: underline;
     }
+    .viz-grid {
+      display: grid;
+      gap: 16px;
+    }
+    .viz-row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .viz-card {
+      border: 2px solid var(--ink);
+      background: white;
+      padding: 10px;
+      display: grid;
+      gap: 6px;
+    }
+    canvas {
+      width: 100%;
+      height: 140px;
+      border: 1px solid var(--ink);
+      background: #fffdf9;
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Speech Enhancement</h1>
+    <h1>Background Noise Clearance and Speech Enhancement</h1>
     <p>Upload a noisy audio file. The model will remove background noise and return a clean version.</p>
 
     <div class="controls">
@@ -103,6 +131,25 @@
       <audio id="player" controls></audio>
       <a id="download" class="link" download>Download enhanced WAV</a>
     </div>
+
+    <div class="viz-grid">
+      <div class="viz-row">
+        <div class="viz-card">
+          <h2>Before</h2>
+          <span class="status">Waveform</span>
+          <canvas id="waveBefore" width="520" height="140"></canvas>
+          <span class="status">Spectrum</span>
+          <canvas id="specBefore" width="520" height="140"></canvas>
+        </div>
+        <div class="viz-card">
+          <h2>After</h2>
+          <span class="status">Waveform</span>
+          <canvas id="waveAfter" width="520" height="140"></canvas>
+          <span class="status">Spectrum</span>
+          <canvas id="specAfter" width="520" height="140"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -112,6 +159,99 @@
     const result = document.getElementById("result");
     const player = document.getElementById("player");
     const download = document.getElementById("download");
+    const waveBefore = document.getElementById("waveBefore");
+    const waveAfter = document.getElementById("waveAfter");
+    const specBefore = document.getElementById("specBefore");
+    const specAfter = document.getElementById("specAfter");
+
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    const drawWaveform = (canvas, samples) => {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#1d1c1a";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+
+      const mid = canvas.height / 2;
+      const step = Math.max(1, Math.floor(samples.length / canvas.width));
+      for (let x = 0; x < canvas.width; x++) {
+        const idx = x * step;
+        const v = samples[idx] || 0;
+        const y = mid - v * mid;
+        if (x === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+    };
+
+    const computeSpectrum = (samples, fftSize = 512) => {
+      const size = Math.min(fftSize, samples.length);
+      const start = Math.max(0, Math.floor((samples.length - size) / 2));
+      const window = samples.slice(start, start + size);
+
+      const spectrum = new Float32Array(size / 2);
+      for (let k = 0; k < spectrum.length; k++) {
+        let re = 0;
+        let im = 0;
+        for (let n = 0; n < size; n++) {
+          const angle = (2 * Math.PI * k * n) / size;
+          re += window[n] * Math.cos(angle);
+          im -= window[n] * Math.sin(angle);
+        }
+        spectrum[k] = Math.sqrt(re * re + im * im);
+      }
+
+      const max = Math.max(...spectrum) || 1;
+      for (let i = 0; i < spectrum.length; i++) {
+        spectrum[i] /= max;
+      }
+      return spectrum;
+    };
+
+    const drawSpectrum = (canvas, spectrum) => {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#ce6b2f";
+      const barWidth = canvas.width / spectrum.length;
+      spectrum.forEach((mag, i) => {
+        const h = mag * canvas.height;
+        ctx.fillRect(i * barWidth, canvas.height - h, barWidth, h);
+      });
+    };
+
+    const decodeFile = async (fileOrBlob) => {
+      const buffer = await fileOrBlob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(buffer);
+      const channels = audioBuffer.numberOfChannels;
+      const length = audioBuffer.length;
+      const mono = new Float32Array(length);
+      for (let ch = 0; ch < channels; ch++) {
+        const data = audioBuffer.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+          mono[i] += data[i] / channels;
+        }
+      }
+      return mono;
+    };
+
+    const renderGraphs = async (fileOrBlob, waveCanvas, specCanvas) => {
+      const samples = await decodeFile(fileOrBlob);
+      drawWaveform(waveCanvas, samples);
+      const spectrum = computeSpectrum(samples);
+      drawSpectrum(specCanvas, spectrum);
+    };
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        return;
+      }
+      await renderGraphs(file, waveBefore, specBefore);
+    });
 
     runBtn.addEventListener("click", async () => {
       const file = fileInput.files[0];
@@ -143,6 +283,8 @@
         download.href = data.url;
         download.textContent = "Download enhanced WAV";
         result.classList.add("active");
+        const enhancedBlob = await fetch(data.url).then((res) => res.blob());
+        await renderGraphs(enhancedBlob, waveAfter, specAfter);
         status.textContent = "Done.";
       } catch (err) {
         status.textContent = err.message;

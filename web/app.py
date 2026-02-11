@@ -32,6 +32,13 @@ NOISE_GATE_FRAME_MS = 20
 
 
 def apply_noise_gate(audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    if audio.ndim == 2:
+        # Handle channel-first or channel-last input.
+        if audio.shape[0] <= 8 and audio.shape[1] > audio.shape[0]:
+            audio = np.mean(audio, axis=0, dtype=np.float32)
+        else:
+            audio = np.mean(audio, axis=1, dtype=np.float32)
+
     if audio.size == 0:
         return audio
 
@@ -99,7 +106,12 @@ class EnhancerService:
         if waveform.ndim == 1:
             waveform = waveform[None, :]
         else:
-            waveform = waveform.T
+            # Collapse to mono for either [samples, channels] or [channels, samples].
+            if waveform.shape[0] <= 8 and waveform.shape[1] > waveform.shape[0]:
+                waveform = np.mean(waveform, axis=0, dtype=np.float32)
+            else:
+                waveform = np.mean(waveform, axis=1, dtype=np.float32)
+            waveform = waveform[None, :]
 
         audio_tensor = torch.from_numpy(waveform).float()
         target_sr = self.audio_processor.sample_rate
